@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Radio, Select, Table } from "antd";
 import searchImg from "../../assets/search.svg";
+import { parse, unparse } from "papaparse";
+import { toast } from "react-toastify";
 
-function TransactionsTable({ transactions }) {
+function TransactionsTable({ transactions, addTransaction, fetchTransactions }) {
   const { Option } = Select;
 
   const [search, setSearch] = useState("");
@@ -10,67 +12,108 @@ function TransactionsTable({ transactions }) {
   const [sortKey, setSortKey] = useState("");
 
   const columns = [
-    {
-      title: "Name",
-      dataIndex: "name",
-      key: "name",
-    },
-    {
-      title: "Amount",
-      dataIndex: "amount",
-      key: "amount",
-    },
-    {
-      title: "Tag",
-      dataIndex: "tag",
-      key: "tag",
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
-    },
-    {
-      title: "Date",
-      dataIndex: "date",
-      key: "date",
-    },
+    { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Amount", dataIndex: "amount", key: "amount" },
+    { title: "Tag", dataIndex: "tag", key: "tag" },
+    { title: "Type", dataIndex: "type", key: "type" },
+    { title: "Date", dataIndex: "date", key: "date" },
   ];
 
-  // 🔍 SEARCH + FILTER
-  const filteredTransactions = transactions.filter(
+  let filteredTransactions = transactions.filter(
     (item) =>
+      item?.name &&
+      item?.type &&
       item.name.toLowerCase().includes(search.toLowerCase()) &&
       item.type.includes(typeFilter)
   );
 
-  // 🔃 SORT (immutable copy)
   let sortedTransactions = [...filteredTransactions];
 
   if (sortKey === "date") {
     sortedTransactions.sort(
       (a, b) => new Date(b.date) - new Date(a.date)
     );
-  } else if (sortKey === "amount") {
+  }
+
+  if (sortKey === "amount") {
     sortedTransactions.sort(
-      (a, b) => b.amount - a.amount
+      (a, b) => Number(b.amount) - Number(a.amount)
     );
   }
 
+  function exportCsv() {
+    if (!transactions.length) {
+      toast.error("No transactions to export");
+      return;
+    }
+
+    const csv = unparse(transactions);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "transactions.csv";
+    link.click();
+  }
+
+  function importFromCsv(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async function (results) {
+        let added = 0;
+        let skipped = 0;
+
+        for (const transaction of results.data) {
+          if (
+            !transaction.name ||
+            !transaction.type ||
+            !transaction.amount ||
+            isNaN(Number(transaction.amount))
+          ) {
+            skipped++;
+            continue;
+          }
+
+          const newTransaction = {
+            ...transaction,
+            amount: Number(transaction.amount),
+          };
+
+          try {
+            await addTransaction(newTransaction, true);
+            added++;
+          } catch {
+            skipped++;
+          }
+        }
+
+        if (added > 0) {
+          toast.success(`${added} transactions imported`);
+          fetchTransactions();
+        }
+
+        if (skipped > 0) {
+          toast.warn(`${skipped} rows skipped`);
+        }
+
+        event.target.value = null;
+      },
+      error: () => toast.error("CSV parsing failed"),
+    });
+  }
+
   return (
-    <div
-      style={{
-        width: "97%",
-        padding: "0rem 2rem",
-      }}
-    >
-      {/* Search + Filter */}
+    <div style={{ width: "97%", padding: "0rem 2rem" }}>
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           gap: "1rem",
-          alignItems: "center",
           marginBottom: "1rem",
         }}
       >
@@ -85,7 +128,7 @@ function TransactionsTable({ transactions }) {
 
         <Select
           className="select-input"
-          onChange={(value) => setTypeFilter(value)}
+          onChange={(value) => setTypeFilter(value || "")}
           value={typeFilter}
           placeholder="Filter"
           allowClear
@@ -96,21 +139,17 @@ function TransactionsTable({ transactions }) {
         </Select>
       </div>
 
-      {/* Table Header + Sort + Import/Export */}
       <div className="my-table">
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
-            width: "100%",
             marginBottom: "1rem",
           }}
         >
           <h2>My Transactions</h2>
 
           <Radio.Group
-            className="input-radio"
             onChange={(e) => setSortKey(e.target.value)}
             value={sortKey}
           >
@@ -119,15 +158,10 @@ function TransactionsTable({ transactions }) {
             <Radio.Button value="amount">Sort by Amount</Radio.Button>
           </Radio.Group>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "1rem",
-              width: "400px",
-            }}
-          >
-            <button className="btn">Export to CSV</button>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <button className="btn" onClick={exportCsv}>
+              Export to CSV
+            </button>
 
             <label htmlFor="file-csv" className="btn btn-blue">
               Import from CSV
@@ -137,16 +171,18 @@ function TransactionsTable({ transactions }) {
               id="file-csv"
               type="file"
               accept=".csv"
+              onChange={importFromCsv}
               style={{ display: "none" }}
             />
           </div>
         </div>
 
-        {/* Table */}
         <Table
           dataSource={sortedTransactions}
           columns={columns}
-          rowKey={(record, index) => index}
+          rowKey={(record, index) =>
+            record.id || `${record.name}-${record.date}-${index}`
+          }
         />
       </div>
     </div>

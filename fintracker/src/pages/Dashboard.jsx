@@ -52,41 +52,45 @@ function Dashboard() {
   };
 
   const calculateBalance = () => {
-    let incomeTotal = 0;
-    let expensesTotal = 0;
+  let incomeTotal = 0;
+  let expensesTotal = 0;
 
-    transactions.forEach((transaction) => {
-      if (transaction.type === "income") {
-        incomeTotal += transaction.amount;
-      } else {
-        expensesTotal += transaction.amount;
-      }
-    });
+  transactions.forEach((transaction) => {
+    const amount = Number(transaction.amount);
 
-    setIncome(incomeTotal);
-    setExpense(expensesTotal);
-    setTotalBalance(incomeTotal - expensesTotal);
-  };
+    if (isNaN(amount)) return;
+
+    if (transaction.type === "income") {
+      incomeTotal += amount;
+    } else if (transaction.type === "expense") {
+      expensesTotal += amount;
+    }
+  });
+
+  setIncome(incomeTotal);
+  setExpense(expensesTotal);
+  setTotalBalance(incomeTotal - expensesTotal);
+};
 
   useEffect(() => {
     calculateBalance();
   }, [transactions]);
 
-  async function addTransaction(transaction) {
+  async function addTransaction(transaction, many) {
     try {
       const docRef = await addDoc(
         collection(db, `users/${user.uid}/transactions`),
         transaction
       );
       console.log("Document written with ID: ", docRef.id);
-      toast.success("Transaction Added!");
+      if (!many) toast.success("Transaction Added!");
       let newArr = transactions;
       newArr.push(transaction);
       setTransactions(newArr);
       calculateBalance();
     } catch (e) {
       console.error("Error adding document: ", e);
-      toast.error("Couldn't add transaction");
+      if (!many) toast.error("Couldn't add transaction");
     }
   }
 
@@ -126,7 +130,10 @@ function Dashboard() {
         handleIncomeCancel={handleIncomeCancel}
         onFinish={onFinish}
       />
-      <TransactionsTable transactions={transactions}/>
+      <TransactionsTable 
+      transactions={transactions} 
+      addTransaction={addTransaction}
+      fetchTransaction={fetchTransactions}/>
     </div>
   );
 }
