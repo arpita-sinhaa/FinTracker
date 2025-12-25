@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Radio, Select, Table } from "antd";
 import searchImg from "../../assets/search.svg";
-import { parse, unparse } from "papaparse";
+import Papa from "papaparse";
 import { toast } from "react-toastify";
 
 function TransactionsTable({ transactions, addTransaction, fetchTransactions }) {
@@ -19,7 +19,7 @@ function TransactionsTable({ transactions, addTransaction, fetchTransactions }) 
     { title: "Date", dataIndex: "date", key: "date" },
   ];
 
-  let filteredTransactions = transactions.filter(
+  const filteredTransactions = transactions.filter(
     (item) =>
       item?.name &&
       item?.type &&
@@ -27,7 +27,7 @@ function TransactionsTable({ transactions, addTransaction, fetchTransactions }) 
       item.type.includes(typeFilter)
   );
 
-  let sortedTransactions = [...filteredTransactions];
+  const sortedTransactions = [...filteredTransactions];
 
   if (sortKey === "date") {
     sortedTransactions.sort(
@@ -47,21 +47,23 @@ function TransactionsTable({ transactions, addTransaction, fetchTransactions }) 
       return;
     }
 
-    const csv = unparse(transactions);
+    const csv = Papa.unparse(transactions);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
     link.href = url;
     link.download = "transactions.csv";
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   }
 
   function importFromCsv(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    parse(file, {
+    Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: async function (results) {
@@ -72,7 +74,6 @@ function TransactionsTable({ transactions, addTransaction, fetchTransactions }) 
           if (
             !transaction.name ||
             !transaction.type ||
-            !transaction.amount ||
             isNaN(Number(transaction.amount))
           ) {
             skipped++;
@@ -80,7 +81,10 @@ function TransactionsTable({ transactions, addTransaction, fetchTransactions }) 
           }
 
           const newTransaction = {
-            ...transaction,
+            name: transaction.name,
+            type: transaction.type,
+            tag: transaction.tag || "",
+            date: transaction.date,
             amount: Number(transaction.amount),
           };
 
