@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import "./styles.css";
-import { auth, db } from "../../firebase";
+import { auth } from "../../firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
@@ -18,33 +18,33 @@ function Header() {
   }, [user, loading, navigate]);
 
   function logoutFnc() {
-    try {
-      signOut(auth)
-        .then(() => {
-          // Sign-out successful.
-          toast.success("Logged out successfully")
-          navigate("/");
-        })
-        .catch((error) => {
-          // An error happened.
-        });
-    } catch (e) {
-      toast.error(e.message);
-    }
+    signOut(auth)
+      .then(() => {
+        toast.success("Logged out successfully");
+        navigate("/");
+      })
+      .catch((e) => toast.error(e.message));
   }
 
   return (
     <div className="navbar">
       <p className="logo">FinTracker</p>
+
       {user && (
-        <div style={{display: "flex", alignItems:"center", gap: "0.75rem"}}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <img
-            src={user.photoURL ? user.photoURL : userImg}
-            style={{borderRadius:"50%", height:"1.5rem", width:"1.5rem"}}
+            src={user.photoURL || userSvg}
+            alt="user"
+            style={{
+              borderRadius: "50%",
+              height: "1.5rem",
+              width: "1.5rem",
+            }}
           />
-        <p className="logo link" onClick={logoutFnc}>
-          Logout
-        </p>
+
+          <p className="logo link" onClick={logoutFnc}>
+            Logout
+          </p>
         </div>
       )}
     </div>
@@ -52,3 +52,4 @@ function Header() {
 }
 
 export default Header;
+
